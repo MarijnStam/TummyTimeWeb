@@ -4,14 +4,23 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "label": "Launch webserver",
+        "label": "Debug webserver",
         "type": "shell",
         "command": "${workspaceFolder}/TummyTime_venv/bin/uvicorn",
-        "args": ["src.main:app", "--reload"],
+        "args": ["src.main:app", "--host", "0.0.0.0", "--port", "8000"],
         "group": {
             "kind": "build",
             "isDefault": true
           }
-      }
+      },
+      {
+        "label": "Leave running",
+        "type": "shell",
+        "command": "${workspaceFolder}/TummyTime_venv/bin/gunicorn",
+        "args": ["-k", "uvicorn.workers.UvicornWorker", "src.main:app"],
+        "group": {
+            "kind": "build",
+          }
+      },
     ]
   }
