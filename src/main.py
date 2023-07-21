@@ -16,17 +16,24 @@ class Food(BaseModel):
     ingredients: Set[str] = set()
     mealName: str
 
+
 app = FastAPI()
 
-@app.get("/ingredients/")
-#TODO Format to return only ingredient names and not IDs
-async def get_ingredients() -> Set[str]:
-    return db.getAllIngredients() 
+# Returns the base ingredients for a meal
+@app.get("/meal_ingredients/")
+async def get_ingredients(mealName : str) -> Set[str]:
+    meal = db.getMeal(name=mealName)
+    return set(db.getMealIngredients(meal[db.DB_MEAL_ID_IDX]))
 
-@app.get("/meal_names/")
-#TODO Format to return only ingredient names and not IDs
+# Returns the names of all stored meals in a set
+@app.get("/meals/")
 async def get_meal_names() -> Set[str]:
-    return db.getAllMeals()
+    meals = set()
+    dbResult = db.getAllMeals()
+    for meal in dbResult:
+        meals.add(meal[db.DB_MEAL_NAME_IDX])
+
+    return meals
 
 @app.put("/feel/")
 async def feel_entry(feeling: Feel):
@@ -48,7 +55,4 @@ async def new_meal(food: Food):
 
 @app.put("/meal_entry/")
 async def meal_entry(food: Food):
-    return food
-
-
-
+    # First retrieve the information of the meal 

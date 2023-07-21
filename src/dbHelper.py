@@ -3,6 +3,11 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+DB_MEAL_ID_IDX=0
+DB_MEAL_NAME_IDX=1
+DB_INGREDIENT_ID_IDX=0
+DB_INGREDIENT_NAME_IDX=1
+
 
 class SQLite:
     """
@@ -119,7 +124,6 @@ def getMeal(name: str = "", id: int = 0):
         except sqlite3.Error as e:
             raise sqlite3.Error(e)
 
-
 def getAllMeals():
     """
     Gets all meals from the DB
@@ -132,6 +136,32 @@ def getAllMeals():
     with SQLite() as cur:
         try:
             cur.execute("SELECT * FROM Meals;")
+            return cur.fetchall()
+        except sqlite3.Error as e:
+            raise sqlite3.Error(e)
+        
+    
+def getMealIngredients(id: int):
+    """
+    Gets a base ingredients of a registered meal
+
+    Parameters
+    ----------
+    id   : `int`\n
+        Unique ID of the meal
+
+    Returns
+    ----------
+    Ingredients : `tuple`\n
+        Ingredients of the found meal
+    """
+    sqlQuery = f"SELECT Name FROM Ingredients"\
+                "INNER JOIN Base_Ingredients ON Ingredients.IngredientID = Base_Ingredients.IngredientID"\
+                "INNER JOIN Meals ON Meals.MealID = Base_Ingredients.MealID"\
+                "WHERE MealID = '{id}';"
+    with SQLite() as cur:
+        try:
+            cur.execute(sqlQuery)
             return cur.fetchall()
         except sqlite3.Error as e:
             raise sqlite3.Error(e)
