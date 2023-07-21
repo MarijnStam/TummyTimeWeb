@@ -119,7 +119,7 @@ def getMeal(name: str = "", id: int = 0):
             if rows is None:
                 raise NotFoundError(f"Unable to find Meal: {sqlParameter}")
 
-            return rows[0]
+            return rows
 
         except sqlite3.Error as e:
             raise sqlite3.Error(e)
@@ -155,10 +155,10 @@ def getMealIngredients(id: int):
     Ingredients : `tuple`\n
         Ingredients of the found meal
     """
-    sqlQuery = f"SELECT Name FROM Ingredients"\
-                "INNER JOIN Base_Ingredients ON Ingredients.IngredientID = Base_Ingredients.IngredientID"\
-                "INNER JOIN Meals ON Meals.MealID = Base_Ingredients.MealID"\
-                "WHERE MealID = '{id}';"
+    sqlQuery = "SELECT Ingredients.Name FROM Ingredients "\
+                "INNER JOIN Base_Ingredients ON Ingredients.ID = Base_Ingredients.IngredientID "\
+                "INNER JOIN Meals ON Meals.ID = Base_Ingredients.MealID "\
+                f"WHERE Meals.ID = '{id}';"
     with SQLite() as cur:
         try:
             cur.execute(sqlQuery)

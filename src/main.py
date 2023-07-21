@@ -19,15 +19,18 @@ class Food(BaseModel):
 class MealEntry(BaseModel):
     Meal: Food
     timestamp: str
-
+    
+class Ingredients(BaseModel):
+    ingredients: Set[str] = set()
 
 app = FastAPI()
 
 # Returns the base ingredients for a meal
 @app.get("/meal_ingredients/")
-async def get_ingredients(mealName : str) -> Set[str]:
+async def get_ingredients(mealName : str) -> Ingredients:
     meal = db.getMeal(name=mealName)
-    return set(db.getMealIngredients(meal[db.DB_MEAL_ID_IDX]))
+    mealIngredients = set(db.getMealIngredients(meal[db.DB_MEAL_ID_IDX]))
+    return mealIngredients
 
 # Returns the names of all stored meals in a set
 @app.get("/meals/")
@@ -42,7 +45,6 @@ async def get_meal_names() -> Set[str]:
 @app.put("/feel/")
 async def feel_entry(feeling: Feel):
     db.setFeel(feeling.feel, feeling.timestamp)
-    return feeling
 
 @app.put("/new_meal/")
 async def new_meal(food: Food):
@@ -54,8 +56,6 @@ async def new_meal(food: Food):
     for ingredient in food.ingredients:
         ingredientID = db.setIngredient(ingredient)
         db.setBase_Ingredients(mealID, ingredientID)
-
-    return food
 
 @app.put("/meal_entry/")
 async def meal_entry(entry: MealEntry):
