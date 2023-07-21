@@ -16,6 +16,10 @@ class Food(BaseModel):
     ingredients: Set[str] = set()
     mealName: str
 
+class MealEntry(BaseModel):
+    Meal: Food
+    timestamp: str
+
 
 app = FastAPI()
 
@@ -54,5 +58,17 @@ async def new_meal(food: Food):
     return food
 
 @app.put("/meal_entry/")
-async def meal_entry(food: Food):
+async def meal_entry(entry: MealEntry):
     # First retrieve the information of the meal 
+    mealID = db.getMeal(name=entry.Meal.mealName)[db.DB_MEAL_ID_IDX]
+
+    # Register the Meal Entry and retrieve
+    mealEntryID = db.setMealEntry(mealID, entry.timestamp)
+
+    # Retrieve the base ingredients for this meal and append the extra ingredients.
+    # TODO Handle case where ingredient is already in db
+    baseIngredients = set(db.getMealIngredients(mealID))
+    for ingredient in entry.Meal.ingredients:
+        baseIngredients.add(ingredient)
+        ingredientID = db.setIngredient(ingredient)
+        db.setMealEntry_Ingredients(mealEntryID, ingredientID)
