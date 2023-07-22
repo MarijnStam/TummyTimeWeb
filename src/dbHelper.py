@@ -3,10 +3,10 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DB_MEAL_ID_IDX=0
-DB_MEAL_NAME_IDX=1
-DB_INGREDIENT_ID_IDX=0
-DB_INGREDIENT_NAME_IDX=1
+MEAL_ID_IDX=0
+MEAL_NAME_IDX=1
+INGREDIENT_ID_IDX=0
+INGREDIENT_NAME_IDX=1
 
 
 class SQLite:
@@ -28,6 +28,9 @@ class SQLite:
 
 
 class NotFoundError(Exception):
+    pass
+
+class NotUniqueError(Exception):
     pass
 
 
@@ -81,6 +84,8 @@ def setMeal(name: str):
             cur.execute(f"INSERT INTO Meals (Name) VALUES ('{name}')")
             return cur.lastrowid
         except sqlite3.Error as e:
+            if(type(e) == sqlite3.IntegrityError):
+                raise NotUniqueError("Meal name already in DB")
             raise sqlite3.Error(e)
 
 
@@ -155,7 +160,7 @@ def getMealIngredients(id: int):
     Ingredients : `tuple`\n
         Ingredients of the found meal
     """
-    sqlQuery = "SELECT Ingredients.Name FROM Ingredients "\
+    sqlQuery = "SELECT * FROM Ingredients "\
                 "INNER JOIN Base_Ingredients ON Ingredients.ID = Base_Ingredients.IngredientID "\
                 "INNER JOIN Meals ON Meals.ID = Base_Ingredients.MealID "\
                 f"WHERE Meals.ID = '{id}';"
@@ -187,6 +192,8 @@ def setIngredient(name: str):
             cur.execute(f"INSERT INTO Ingredients (Name) VALUES ('{name}')")
             return cur.lastrowid
         except sqlite3.Error as e:
+            if(type(e) == sqlite3.IntegrityError):
+                raise NotUniqueError("Ingredient name already in DB")
             raise sqlite3.Error(e)
 
 

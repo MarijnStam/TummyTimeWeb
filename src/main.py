@@ -19,28 +19,20 @@ class Food(BaseModel):
 class MealEntry(BaseModel):
     Meal: Food
     timestamp: str
-    
-class Ingredients(BaseModel):
-    ingredients: Set[str] = set()
 
 app = FastAPI()
 
 # Returns the base ingredients for a meal
 @app.get("/meal_ingredients/")
-async def get_ingredients(mealName : str) -> Ingredients:
-    meal = db.getMeal(name=mealName)
-    mealIngredients = set(db.getMealIngredients(meal[db.DB_MEAL_ID_IDX]))
-    return mealIngredients
+async def get_ingredients(mealName : str) -> Set[str]:
+    return set(i[db.INGREDIENT_NAME_IDX] for i in db.getMealIngredients(db.getMeal(name=mealName)[db.MEAL_ID_IDX]))
+
 
 # Returns the names of all stored meals in a set
 @app.get("/meals/")
 async def get_meal_names() -> Set[str]:
-    meals = set()
-    dbResult = db.getAllMeals()
-    for meal in dbResult:
-        meals.add(meal[db.DB_MEAL_NAME_IDX])
+    return set((i[db.MEAL_NAME_IDX] for i in db.getAllMeals()))
 
-    return meals
 
 @app.put("/feel/")
 async def feel_entry(feeling: Feel):
@@ -48,27 +40,40 @@ async def feel_entry(feeling: Feel):
 
 @app.put("/new_meal/")
 async def new_meal(food: Food):
-    #TODO Handle case where meal is already in db
-    mealID = db.setMeal(food.mealName)
+    try:
+        mealID = db.setMeal(food.mealName)
+    except db.NotUniqueError as e:
+        print(e)
+        return
 
     # Store all the ingredients and update the join table with ingredients for this meal
-    # TODO Handle case where ingredient is already in db
     for ingredient in food.ingredients:
-        ingredientID = db.setIngredient(ingredient)
+        try:
+            ingredientID = db.setIngredient(ingredient)
+        except db.NotUniqueError as e:
+            print(e)
+            pass
+        
         db.setBase_Ingredients(mealID, ingredientID)
 
 @app.put("/meal_entry/")
 async def meal_entry(entry: MealEntry):
     # First retrieve the information of the meal 
-    mealID = db.getMeal(name=entry.Meal.mealName)[db.DB_MEAL_ID_IDX]
+    mealID = db.getMeal(name=entry.Meal.mealName)[db.MEAL_ID_IDX]
 
-    # Register the Meal Entry and retrieve
+    # Register the Meal Entry and retrieve ID
     mealEntryID = db.setMealEntry(mealID, entry.timestamp)
 
     # Retrieve the base ingredients for this meal and append the extra ingredients.
-    # TODO Handle case where ingredient is already in db
     baseIngredients = set(db.getMealIngredients(mealID))
-    for ingredient in entry.Meal.ingredients:
-        baseIngredients.add(ingredient)
-        ingredientID = db.setIngredient(ingredient)
+    ingredients = baseIngredients.union(entry.Meal.ingredients)
+    
+    for ingredient in ingredients:
+        try:
+            ingredientID = db.setIngredient(ingredient)
+        except db.NotUniqueError as e:
+            ingredientID = db.getIngredient(name=ingredient)[db.INGREDIENT_ID_IDX]
+            print(e)
+            pass
+        
         db.setMealEntry_Ingredients(mealEntryID, ingredientID)
