@@ -232,7 +232,7 @@ def getIngredient(name: str = "", id: int = 0):
             if rows is None:
                 raise NotFoundError(f"Unable to find Ingredients: {sqlParameter}")
 
-            return rows[0]
+            return rows
 
         except sqlite3.Error as e:
             raise sqlite3.Error(e)

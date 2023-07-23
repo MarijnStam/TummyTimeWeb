@@ -51,10 +51,10 @@ async def new_meal(food: Food):
         try:
             ingredientID = db.setIngredient(ingredient)
         except db.NotUniqueError as e:
+            ingredientID = db.getIngredient(name=ingredient)[db.INGREDIENT_ID_IDX]
             print(e)
-            pass
-        
-        db.setBase_Ingredients(mealID, ingredientID)
+        finally:
+            db.setBase_Ingredients(mealID, ingredientID)
 
 @app.put("/meal_entry/")
 async def meal_entry(entry: MealEntry):
@@ -65,7 +65,7 @@ async def meal_entry(entry: MealEntry):
     mealEntryID = db.setMealEntry(mealID, entry.timestamp)
 
     # Retrieve the base ingredients for this meal and append the extra ingredients.
-    baseIngredients = set(db.getMealIngredients(mealID))
+    baseIngredients = set(i[db.INGREDIENT_NAME_IDX] for i in db.getMealIngredients(mealID))
     ingredients = baseIngredients.union(entry.Meal.ingredients)
     
     for ingredient in ingredients:
@@ -74,6 +74,7 @@ async def meal_entry(entry: MealEntry):
         except db.NotUniqueError as e:
             ingredientID = db.getIngredient(name=ingredient)[db.INGREDIENT_ID_IDX]
             print(e)
-            pass
+        finally:
+            db.setMealEntry_Ingredients(mealEntryID, ingredientID)
+            
         
-        db.setMealEntry_Ingredients(mealEntryID, ingredientID)
