@@ -37,6 +37,7 @@ async def get_meal_names() -> Set[str]:
 @app.put("/feel/")
 async def feel_entry(feeling: Feel):
     db.setFeel(feeling.feel, feeling.timestamp)
+    return feeling
 
 @app.put("/new_meal/")
 async def new_meal(food: Food):
@@ -55,6 +56,8 @@ async def new_meal(food: Food):
             print(e)
         finally:
             db.setBase_Ingredients(mealID, ingredientID)
+            
+    return food
 
 @app.put("/meal_entry/")
 async def meal_entry(entry: MealEntry):
@@ -76,5 +79,7 @@ async def meal_entry(entry: MealEntry):
             print(e)
         finally:
             db.setMealEntry_Ingredients(mealEntryID, ingredientID)
+            
+    return entry
             
         
