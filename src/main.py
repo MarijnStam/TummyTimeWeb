@@ -35,12 +35,12 @@ async def get_meal_names() -> Set[str]:
 
 
 @app.put("/feel/")
-async def feel_entry(feeling: Feel):
+async def feel_entry(feeling: Feel) -> Feel:
     db.setFeel(feeling.feel, feeling.timestamp)
     return feeling
 
 @app.put("/new_meal/")
-async def new_meal(food: Food):
+async def new_meal(food: Food) -> Food:
     try:
         mealID = db.setMeal(food.mealName)
     except db.NotUniqueError as e:
@@ -60,7 +60,7 @@ async def new_meal(food: Food):
     return food
 
 @app.put("/meal_entry/")
-async def meal_entry(entry: MealEntry):
+async def meal_entry(entry: MealEntry) -> MealEntry:
     # First retrieve the information of the meal 
     mealID = db.getMeal(name=entry.Meal.mealName)[db.MEAL_ID_IDX]
 
