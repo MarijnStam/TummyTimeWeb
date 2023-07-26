@@ -1,89 +1,74 @@
-from fastapi import FastAPI, Body, Request
+from fastapi import FastAPI, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlmodel import Session, select
+from sqlalchemy.exc import IntegrityError
 
 from typing import Set
 from typing_extensions import Annotated
 
-from .dbHelper import createDB, engine
-from .models.TableModels import *
-
-
-class Feel(BaseModel):
-    feel: Annotated[int, Body(gt=0, le=10)]
-    timestamp: str
-
-
-class Food(BaseModel):
-    ingredients: Set[str] = set()
-    mealName: str
-
-class MealEntry(BaseModel):
-    Meal: Food
-    timestamp: str
+from .dbHelper import create_db, get_session
+from .models import *
 
 app = FastAPI()
 
 @app.on_event("startup")
 def on_startup():
-    createDB()
+    create_db()
 
-# Returns the base ingredients for a meal
-@app.get("/meal_ingredients/")
-async def get_ingredients(mealName : str) -> Set[str]:
-    return set(i[db.INGREDIENT_NAME_IDX] for i in db.getMealIngredients(db.getMeal(name=mealName)[db.MEAL_ID_IDX]))
+# Returns a single meal including base ingredients
+@app.get("/meal/{meal_id}", response_model=MealRead)
+async def get_meal(*, session: Session = Depends(get_session), meal_id : int):
+    meal = session.get(Meal, meal_id)
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    return meal
 
+# Returns all meals (without their base ingredients)
+@app.get("/meals/", response_model=List[MealReadAll])
+async def get_meals(*, session: Session = Depends(get_session)):
+    return session.exec(select(Meal)).all()
 
-# Returns the names of all stored meals in a set
-@app.get("/meals/")
-async def get_meal_names() -> Set[str]:
-    return set((i[db.MEAL_NAME_IDX] for i in db.getAllMeals()))
+@app.put("/feel/", response_model=FeelRead)
+async def feel_entry(*, session: Session = Depends(get_session), feeling: FeelCreate):
+    db_feel = Feel.from_orm(feeling)
+    session.add(db_feel)
+    session.commit()
+    session.refresh(db_feel)
+    return db_feel
 
+@app.put("/new_meal/", response_model=MealReadAll)
+async def new_meal(*, session: Session = Depends(get_session), new_meal: MealCreate):
+    db_meal = Meal.from_orm(new_meal)
+    ingredients = [Ingredient(name=x.name) for x in new_meal.ingredients]
 
-@app.put("/feel/")
-async def feel_entry(feeling: Feel) -> Feel:
-    db.setFeel(feeling.feel, feeling.timestamp)
-    return feeling
-
-@app.put("/new_meal/")
-async def new_meal(food: Food) -> Food:
-    try:
-        mealID = db.setMeal(food.mealName)
-    except db.NotUniqueError as e:
-        print(e)
-        return
-
-    # Store all the ingredients and update the join table with ingredients for this meal
-    for ingredient in food.ingredients:
-        try:
-            ingredientID = db.setIngredient(ingredient)
-        except db.NotUniqueError as e:
-            ingredientID = db.getIngredient(name=ingredient)[db.INGREDIENT_ID_IDX]
-            print(e)
-        finally:
-            db.setBase_Ingredients(mealID, ingredientID)
-            
-    return food
-
-@app.put("/meal_entry/")
-async def meal_entry(entry: MealEntry) -> MealEntry:
-    # First retrieve the information of the meal 
-    mealID = db.getMeal(name=entry.Meal.mealName)[db.MEAL_ID_IDX]
-
-    # Register the Meal Entry and retrieve ID
-    mealEntryID = db.setMealEntry(mealID, entry.timestamp)
-
-    # Retrieve the base ingredients for this meal and append the extra ingredients.
-    baseIngredients = set(i[db.INGREDIENT_NAME_IDX] for i in db.getMealIngredients(mealID))
-    ingredients = baseIngredients.union(entry.Meal.ingredients)
+    #We need to check what ingredients already exist in our DB. 
+    new_ingredients = [x for x in ingredients if session.exec(select(Ingredient).where(Ingredient.name == f"{x.name}")).one_or_none() is None]
     
-    for ingredient in ingredients:
-        try:
-            ingredientID = db.setIngredient(ingredient)
-        except db.NotUniqueError as e:
-            ingredientID = db.getIngredient(name=ingredient)[db.INGREDIENT_ID_IDX]
-            print(e)
-        finally:
-            db.setMealEntry_Ingredients(mealEntryID, ingredientID)
-            
-    return entry
-            
+    #TODO Check if meal is unique or reject request
+    # We also have to manually patch in the join table i guess?
+    
+    setattr(db_meal, 'ingredients', new_ingredients)
+    
+    session.add(db_meal)
+
+    session.commit()
+    session.refresh(db_meal)
+    return db_meal
+
+@app.put("/meal_entry/", response_model=MealEntryRead)
+async def meal_entry(*, session: Session = Depends(get_session), entry: MealEntryCreate):
+    db_meal_entry = MealEntry.from_orm(entry)
+    session.add(db_meal_entry)
+    session.commit()
+    session.refresh(db_meal_entry)
+    return db_meal_entry      
+
+def get_or_create(session, model, **kwargs):
+    instance = session.query(model).filter_by(**kwargs).one_or_none()
+    if instance:
+        return instance
+    else:
+        instance = model(**kwargs)
+        session.add(instance)
+        session.flush()
+        return instance
