@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from typing import Set
 from typing_extensions import Annotated
 
-import src.dbHelper as db
+from .dbHelper import createDB, engine
+from .models.TableModels import *
 
 
 class Feel(BaseModel):
@@ -21,6 +22,10 @@ class MealEntry(BaseModel):
     timestamp: str
 
 app = FastAPI()
+
+@app.on_event("startup")
+def on_startup():
+    createDB()
 
 # Returns the base ingredients for a meal
 @app.get("/meal_ingredients/")
@@ -82,4 +87,3 @@ async def meal_entry(entry: MealEntry) -> MealEntry:
             
     return entry
             
-        
