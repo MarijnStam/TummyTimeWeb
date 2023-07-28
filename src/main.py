@@ -38,22 +38,42 @@ async def feel_entry(*, session: Session = Depends(get_session), feeling: FeelCr
 
 @app.put("/new_meal/", response_model=MealReadAll)
 async def new_meal(*, session: Session = Depends(get_session), new_meal: MealCreate):
-    db_meal = Meal.from_orm(new_meal)
+    meal = Meal.from_orm(new_meal)
+    
+    session.add(meal)
+    try:
+        session.commit()
+    except IntegrityError as e:
+        print(f"Meal {meal.name} already in DB")
+        raise HTTPException(status_code=405, detail="Meal already exists")
+        
     ingredients = [Ingredient(name=x.name) for x in new_meal.ingredients]
-
     #We need to check what ingredients already exist in our DB. 
-    new_ingredients = [x for x in ingredients if session.exec(select(Ingredient).where(Ingredient.name == f"{x.name}")).one_or_none() is None]
-    
-    #TODO Check if meal is unique or reject request
-    # We also have to manually patch in the join table i guess?
-    
-    setattr(db_meal, 'ingredients', new_ingredients)
-    
-    session.add(db_meal)
+    for ingredient in ingredients:
+        session.add(ingredient)
+        try:
+            session.commit()
+        except IntegrityError as e:
+            print(f"Ingredient {ingredient.name} already in DB")
+            session.rollback()
+            
+            #Retrieve the ID of the already existing ingredient
+            db_ingredient = session.exec(select(Ingredient).where(Ingredient.name == f"{ingredient.name}")).one()
+            if db_ingredient:
+                ingredient.id = db_ingredient.id  
+            else:
+                raise e.add_detail(f"Ingredient already in DB but not found under name {ingredient.name}")
+            pass
+        
+        #Manually patch the join table
+        finally:
+            session.add(MealIngredient(meal_id=meal.id, ingredient_id=ingredient.id))
+            session.commit()
+            session.flush()
 
-    session.commit()
-    session.refresh(db_meal)
-    return db_meal
+    session.refresh(meal)
+    
+    return meal
 
 @app.put("/meal_entry/", response_model=MealEntryRead)
 async def meal_entry(*, session: Session = Depends(get_session), entry: MealEntryCreate):
@@ -62,13 +82,3 @@ async def meal_entry(*, session: Session = Depends(get_session), entry: MealEntr
     session.commit()
     session.refresh(db_meal_entry)
     return db_meal_entry      
-
-def get_or_create(session, model, **kwargs):
-    instance = session.query(model).filter_by(**kwargs).one_or_none()
-    if instance:
-        return instance
-    else:
-        instance = model(**kwargs)
-        session.add(instance)
-        session.flush()
-        return instance
