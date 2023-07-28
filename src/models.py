@@ -49,7 +49,7 @@ class MealEntry(MealEntryBase, table=True):
     ingredients: List[Ingredient] = Relationship(back_populates="meal_entries", link_model=MealEntryIngredients)
     
 class MealEntryCreate(MealEntryBase):
-    pass
+    ingredients: Optional[List[IngredientCreate]] = []
 
 class MealEntryRead(MealEntryBase):
     id: int    

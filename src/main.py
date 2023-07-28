@@ -78,7 +78,40 @@ async def new_meal(*, session: Session = Depends(get_session), new_meal: MealCre
 @app.put("/meal_entry/", response_model=MealEntryRead)
 async def meal_entry(*, session: Session = Depends(get_session), entry: MealEntryCreate):
     db_meal_entry = MealEntry.from_orm(entry)
+    
+    db_meal = session.exec(select(Meal).where(Meal.id == f"{entry.meal_id}")).one_or_none()
+    if not db_meal:
+        raise HTTPException(status_code=404, detail="Meal not found")
+    
     session.add(db_meal_entry)
     session.commit()
     session.refresh(db_meal_entry)
-    return db_meal_entry      
+    
+
+    ingredients = [Ingredient(name=x.name) for x in entry.ingredients]
+
+    for ingredient in ingredients:
+        #Note that we only want to include this ingredient to the join table if it is not in the base ingredient list of the meal
+        #If they exist on the base list, we don't need to do anything
+        if not all(x.name != ingredient.name for x in db_meal.ingredients):
+            continue
+            
+        session.add(ingredient)
+        try:
+            session.commit()
+        except IntegrityError as e:
+            print(f"Ingredient {ingredient.name} already in DB")
+            session.rollback()
+            
+        finally:            
+            if ingredient.id is not None:
+                session.add(MealEntryIngredients(meal_entry_id=db_meal_entry.id, ingredient_id=ingredient.id))
+                    
+            else:
+                db_ingredient = session.exec(select(Ingredient).where(Ingredient.name == f"{ingredient.name}")).one()
+                session.add(MealEntryIngredients(meal_entry_id=db_meal_entry.id, ingredient_id=db_ingredient.id))
+               
+            session.commit()     
+            pass     
+
+    return db_meal_entry     
